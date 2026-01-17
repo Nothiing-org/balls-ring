@@ -1,9 +1,9 @@
-export type RevealMode = 'total' | 'delta';
+export type RevealMode = 'total' | 'delta' | 'escape';
 
 export interface Day {
   dayIndex: number;
   followerCount: number;
-  pixelsRevealed: number;
+  pixelsRevealed?: number;
   frameDataUri?: string;
   createdAt: string;
 }

@@ -17,13 +17,22 @@ import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
 import { FileUp, Loader2 } from 'lucide-react';
 import Image from 'next/image';
+import { Badge } from '../ui/badge';
 
 const projectSchema = z.object({
   name: z.string().min(1, 'Project name is required'),
-  baseImage: z.instanceof(File, { message: 'Image is required' }),
-  revealMode: z.enum(['total', 'delta']),
+  baseImage: z.instanceof(File).optional(),
+  revealMode: z.enum(['total', 'delta', 'escape']),
   pixelsPerFollower: z.number().min(1).max(100),
   randomSeed: z.number(),
+}).superRefine((data, ctx) => {
+  if ((data.revealMode === 'total' || data.revealMode === 'delta') && !data.baseImage) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['baseImage'],
+      message: 'Image is required for this reveal mode',
+    });
+  }
 });
 
 type ProjectFormData = z.infer<typeof projectSchema>;
@@ -54,6 +63,7 @@ export default function NewProjectForm() {
   });
 
   const pixelsPerFollower = watch('pixelsPerFollower');
+  const revealMode = watch('revealMode');
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -79,6 +89,12 @@ export default function NewProjectForm() {
     setIsLoading(true);
 
     try {
+      if (data.revealMode === 'total' || data.revealMode === 'delta') {
+        if (!data.baseImage) {
+            toast({ title: 'Error', description: 'Please select an image.', variant: 'destructive' });
+            setIsLoading(false);
+            return;
+        }
         const reader = new FileReader();
         reader.readAsDataURL(data.baseImage);
         reader.onload = (e) => {
@@ -143,6 +159,28 @@ export default function NewProjectForm() {
             toast({ title: 'Error', description: 'Failed to read file.', variant: 'destructive' });
             setIsLoading(false);
         }
+      } else { // Escape mode
+        const newProjectId = crypto.randomUUID();
+        const newProject: Omit<Project, 'userId'> = {
+          id: newProjectId,
+          name: data.name,
+          croppedImageUri: '', // No image for escape mode
+          revealMode: data.revealMode as RevealMode,
+          pixelsPerFollower: data.pixelsPerFollower,
+          maxPixelsCap: 0, // Not applicable
+          randomSeed: data.randomSeed,
+          days: [],
+          createdAt: new Date().toISOString(),
+        };
+
+        addProject(newProject);
+        
+        toast({
+            title: 'Project Created',
+            description: `Your new project "${data.name}" is ready.`,
+        });
+        router.push(`/projects/${newProjectId}`);
+      }
     } catch (error) {
       console.error(error);
       toast({
@@ -167,48 +205,50 @@ export default function NewProjectForm() {
         {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="baseImage" className="label-sm">Base Image</Label>
-        <div className="mt-2">
-          <Controller
-            name="baseImage"
-            control={control}
-            render={({ field }) => (
-              <div className="w-full">
-                <label
-                  htmlFor="baseImage-input"
-                  className="relative flex flex-col items-center justify-center w-full h-64 border-2 border-border border-dashed rounded-lg cursor-pointer bg-input hover:bg-accent"
-                >
-                  {imagePreview ? (
-                    <Image
-                      src={imagePreview}
-                      alt="Image preview"
-                      fill
-                      className="object-contain p-2 rounded-lg"
+      {(revealMode === 'total' || revealMode === 'delta') && (
+        <div className="space-y-2">
+          <Label htmlFor="baseImage" className="label-sm">Base Image</Label>
+          <div className="mt-2">
+            <Controller
+              name="baseImage"
+              control={control}
+              render={({ field }) => (
+                <div className="w-full">
+                  <label
+                    htmlFor="baseImage-input"
+                    className="relative flex flex-col items-center justify-center w-full h-64 border-2 border-border border-dashed rounded-lg cursor-pointer bg-input hover:bg-accent"
+                  >
+                    {imagePreview ? (
+                      <Image
+                        src={imagePreview}
+                        alt="Image preview"
+                        fill
+                        className="object-contain p-2 rounded-lg"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <FileUp className="w-8 h-8 mb-4 text-muted-foreground" />
+                        <p className="mb-2 text-sm text-muted-foreground">
+                          <span className="font-semibold">Click to upload</span> or drag and drop
+                        </p>
+                        <p className="text-xs text-muted-foreground">PNG, JPG, GIF up to 10MB</p>
+                      </div>
+                    )}
+                    <input
+                      id="baseImage-input"
+                      type="file"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleImageChange}
                     />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <FileUp className="w-8 h-8 mb-4 text-muted-foreground" />
-                      <p className="mb-2 text-sm text-muted-foreground">
-                        <span className="font-semibold">Click to upload</span> or drag and drop
-                      </p>
-                      <p className="text-xs text-muted-foreground">PNG, JPG, GIF up to 10MB</p>
-                    </div>
-                  )}
-                  <input
-                    id="baseImage-input"
-                    type="file"
-                    className="hidden"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                  />
-                </label>
-              </div>
-            )}
-          />
+                  </label>
+                </div>
+              )}
+            />
+          </div>
+          {errors.baseImage && <p className="text-sm text-destructive">{errors.baseImage.message as string}</p>}
         </div>
-        {errors.baseImage && <p className="text-sm text-destructive">{errors.baseImage.message as string}</p>}
-      </div>
+      )}
 
       <div className="space-y-4">
         <Label className="label-sm">Reveal Mode</Label>
@@ -219,7 +259,7 @@ export default function NewProjectForm() {
             <RadioGroup
               onValueChange={field.onChange}
               defaultValue={field.value}
-              className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              className="grid grid-cols-1 gap-4"
             >
               <Label className="flex flex-col items-start space-y-2 rounded-lg border p-4 cursor-pointer has-[:checked]:bg-accent has-[:checked]:border-foreground">
                 <RadioGroupItem value="total" />
@@ -231,6 +271,14 @@ export default function NewProjectForm() {
                 <span className="font-bold">New Followers (Delta)</span>
                 <span className="text-sm text-muted-foreground">Reveals pixels only for new followers gained since the last update.</span>
               </Label>
+              <Label className="flex flex-col items-start space-y-2 rounded-lg border p-4 cursor-pointer has-[:checked]:bg-accent has-[:checked]:border-foreground">
+                 <div className="flex w-full justify-between items-center">
+                    <RadioGroupItem value="escape" />
+                    <Badge variant="outline" className="border-primary text-primary">High Retention</Badge>
+                 </div>
+                <span className="font-bold">Escape Room</span>
+                <span className="text-sm text-muted-foreground">A kinetic frustration game where orbs try to escape a rotating prison.</span>
+              </Label>
             </RadioGroup>
           )}
         />
@@ -238,7 +286,9 @@ export default function NewProjectForm() {
 
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <Label htmlFor="pixelsPerFollower" className="label-sm">Pixels per Follower</Label>
+          <Label htmlFor="pixelsPerFollower" className="label-sm">
+            {revealMode === 'escape' ? 'Orbs per Follower' : 'Pixels per Follower'}
+          </Label>
           <span className="text-lg font-bold">{pixelsPerFollower}</span>
         </div>
         <Controller

@@ -95,7 +95,6 @@
       "required": [
         "dayIndex",
         "followerCount",
-        "pixelsRevealed",
         "createdAt"
       ]
     },
