@@ -17,7 +17,7 @@ export default function ProjectList() {
           <h2 className="font-headline text-3xl font-bold">Your Projects</h2>
           <Link href="/projects/new" className="btn-primary">
             <PlusCircle size={20} />
-            <span>New Project</span>
+            <span className="hidden md:inline">New Project</span>
           </Link>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -44,7 +44,7 @@ export default function ProjectList() {
         <h2 className="font-headline text-3xl font-bold">Your Projects</h2>
         <Link href="/projects/new" className="btn-primary">
           <PlusCircle size={20} />
-          <span>New Project</span>
+          <span className="hidden md:inline">New Project</span>
         </Link>
       </div>
       {projects.length > 0 ? (
@@ -64,7 +64,7 @@ export default function ProjectList() {
             </p>
             <Link href="/projects/new" className="btn-primary">
               <PlusCircle size={20} />
-              Create Your First Project
+              <span>Create Your First Project</span>
             </Link>
           </div>
         </RevealWrapper>

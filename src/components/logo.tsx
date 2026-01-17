@@ -1,6 +1,6 @@
 export default function Logo() {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 text-foreground">
       <svg
         width="10"
         height="10"
@@ -8,7 +8,7 @@ export default function Logo() {
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <circle cx="6" cy="6" r="6" fill="black" />
+        <circle cx="6" cy="6" r="6" fill="currentColor" />
       </svg>
       <span className="font-bold text-lg">llumina</span>
     </div>
