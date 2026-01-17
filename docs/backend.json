@@ -1,0 +1,215 @@
+{
+  "entities": {
+    "Project": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Project",
+      "type": "object",
+      "description": "Represents a video project with settings for revealing an image based on follower progress.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the project."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who created the project. (Relationship: User 1:N Project)"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the project."
+        },
+        "targetPlatform": {
+          "type": "string",
+          "description": "The target platform for the video (e.g., TikTok, Instagram)."
+        },
+        "resolutionPreset": {
+          "type": "string",
+          "description": "The resolution preset for the video (e.g., 1080x1920)."
+        },
+        "baseImageUrl": {
+          "type": "string",
+          "description": "URL of the base image used in the project."
+        },
+        "revealMode": {
+          "type": "string",
+          "description": "The reveal mode (total followers or new followers)."
+        },
+        "pixelsPerFollower": {
+          "type": "number",
+          "description": "The number of pixels revealed per follower."
+        },
+        "maxPixelsCap": {
+          "type": "number",
+          "description": "The maximum number of pixels that can be revealed."
+        },
+        "randomSeed": {
+          "type": "string",
+          "description": "The random seed used for pixel reveal."
+        },
+        "createdDate": {
+          "type": "string",
+          "description": "The date and time the project was created.",
+          "format": "date-time"
+        },
+        "modifiedDate": {
+          "type": "string",
+          "description": "The date and time the project was last modified.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "name",
+        "targetPlatform",
+        "resolutionPreset",
+        "baseImageUrl",
+        "revealMode",
+        "pixelsPerFollower",
+        "maxPixelsCap",
+        "randomSeed"
+      ]
+    },
+    "DailyUpdate": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DailyUpdate",
+      "type": "object",
+      "description": "Represents a daily update for a project, including follower count and pixels revealed.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the daily update."
+        },
+        "projectId": {
+          "type": "string",
+          "description": "Reference to the Project this update belongs to. (Relationship: Project 1:N DailyUpdate)"
+        },
+        "dayNumber": {
+          "type": "number",
+          "description": "The day number of the update."
+        },
+        "followerCount": {
+          "type": "number",
+          "description": "The follower count for the day."
+        },
+        "pixelsRevealed": {
+          "type": "number",
+          "description": "The number of pixels revealed on this day."
+        },
+        "videoUrl": {
+          "type": "string",
+          "description": "URL of the generated video for this day."
+        },
+        "updateDate": {
+          "type": "string",
+          "description": "The date and time this update was generated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "dayNumber",
+        "followerCount",
+        "pixelsRevealed"
+      ]
+    },
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user.",
+          "format": "email"
+        },
+        "createdDate": {
+          "type": "string",
+          "description": "The date and time the user was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "email"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles. Path-based ownership ensures only the user can access their profile.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/projects/{projectId}",
+        "definition": {
+          "entityName": "Project",
+          "schema": {
+            "$ref": "#/backend/entities/Project"
+          },
+          "description": "Stores video projects created by the user. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "projectId",
+              "description": "The unique identifier for the project."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/projects/{projectId}/dailyUpdates/{dailyUpdateId}",
+        "definition": {
+          "entityName": "DailyUpdate",
+          "schema": {
+            "$ref": "#/backend/entities/DailyUpdate"
+          },
+          "description": "Stores daily updates for a specific project. Includes denormalized 'projectId' and 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "projectId",
+              "description": "The unique identifier for the project."
+            },
+            {
+              "name": "dailyUpdateId",
+              "description": "The unique identifier for the daily update."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to ensure authorization independence, clarity, and scalability for the PixelReveal application.  The core principle is to avoid `get()` calls in security rules by denormalizing authorization data. The structure supports QAPs by segregating data based on ownership and access control needs.\n\n*   **User Data:** User profiles are stored under `/users/{userId}`. This path-based ownership makes securing user-specific data straightforward.\n*   **Project Data:** Projects are stored under `/users/{userId}/projects/{projectId}` to represent the 1:N relationship between users and their projects. This ensures that only the owner can manage their projects.  Each project stores its `userId`, facilitating owner-based rules.\n*   **Daily Updates:** Daily updates for each project are stored under `/users/{userId}/projects/{projectId}/dailyUpdates/{dailyUpdateId}` to continue the path-based ownership for nested data. The `projectId` field is included in each daily update document. This allows rules to quickly verify ownership without additional reads.\n\nThis design ensures that security rules can be written based solely on the `request.auth.uid` and the document's data, avoiding complex `get()` calls and making the application more secure, scalable, and debuggable. It also aligns with the DBAC (Database-Based Access Control) principle, as all authorization information is stored directly within the database. Anonymous authentication is supported directly via Firebase Auth.\n\n**QAPs Support**\n\n*   **List Operations:** Secure list operations are supported because the structure enforces consistent ownership. Listing projects under `/users/{userId}/projects` or daily updates under `/users/{userId}/projects/{projectId}/dailyUpdates` can be secured by verifying that `request.auth.uid == userId`.\n\n**Authorization Independence**\n\n*   Each project and daily update includes the `userId` of its owner, removing the need to fetch the parent user document to verify ownership. This denormalization enables atomic operations and simplifies security rules, avoiding hierarchical authorization dependencies."
+  }
+}

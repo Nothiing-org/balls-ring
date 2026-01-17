@@ -1,0 +1,146 @@
+/**
+ * Core Philosophy: This ruleset enforces a strict user-ownership model where all user-generated content,
+ * such as projects and their daily updates, is stored in subcollections under that user's specific
+ * document. Access is granted based on the user's authenticated UID matching the path of the data they are
+ * trying to access. This creates a secure, private data silo for each user.
+ *
+ * Data Structure: The data is organized hierarchically to reflect ownership. The root of all user data is the
+ * /users/{userId} collection. All subsequent data, like /projects/{projectId} and their nested
+ * /dailyUpdates/{dailyUpdateId}, is located within this user-specific path.
+ *
+ * Key Security Decisions:
+ * - User data is private by default. A user can only access documents within their own data tree (i.e., paths starting with /users/{their-own-userId}).
+ * - Listing users from the top-level /users collection is explicitly disallowed to prevent user enumeration.
+ * - Anonymous users are supported; they are treated like any other authenticated user with a unique UID, able to create and manage their own private data.
+ * - All writes require authentication and ownership verification. There are no publicly writable collections.
+ *
+ * Denormalization for Authorization: To ensure fast and simple authorization checks, key identifiers are
+ * stored directly on the documents. For instance, a `Project` document under `/users/{userId}/projects/{projectId}`
+ * also contains a `userId` field internally. The rules validate this relationship on creation and enforce its
+* immutability on update, ensuring data integrity without needing costly cross-document `get()` calls.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --------------------------------------------------------------------------------
+    // Helper Functions
+    // --------------------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the currently authenticated user's UID matches the provided userId.
+     * This is the primary function for verifying document ownership.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Checks for ownership on an existing document. Used for update/delete operations
+     * to prevent acting on documents that don't exist.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * VALIDATION: Ensures the user document's internal 'id' matches its path ID on creation.
+     */
+    function isCreatingOwnUserDoc(userId) {
+      return request.resource.data.id == userId;
+    }
+
+    /**
+     * VALIDATION: Enforces immutability of the user's unique ID field.
+     */
+    function isNotChangingId() {
+      return request.resource.data.id == resource.data.id;
+    }
+
+    /**
+     * VALIDATION: On project creation, ensures the new document's internal IDs
+     * (`userId`, `id`) correctly match the path segments.
+     */
+    function isCreatingValidProject(userId, projectId) {
+      return request.resource.data.userId == userId && request.resource.data.id == projectId;
+    }
+
+    /**
+     * VALIDATION: On project update, ensures critical relational IDs (`userId`, `id`) are immutable.
+     */
+    function isNotChangingProjectRelations() {
+      return request.resource.data.userId == resource.data.userId && request.resource.data.id == resource.data.id;
+    }
+    
+    /**
+     * VALIDATION: On daily update creation, ensures the new document's internal IDs
+     * (`projectId`, `id`) correctly match the path segments.
+     */
+    function isCreatingValidDailyUpdate(projectId, dailyUpdateId) {
+      return request.resource.data.projectId == projectId && request.resource.data.id == dailyUpdateId;
+    }
+    
+    /**
+     * VALIDATION: On daily update, ensures critical relational IDs (`projectId`, `id`) are immutable.
+     */
+    function isNotChangingDailyUpdateRelations() {
+      return request.resource.data.projectId == resource.data.projectId && request.resource.data.id == resource.data.id;
+    }
+
+    // --------------------------------------------------------------------------------
+    // Collection Rules
+    // --------------------------------------------------------------------------------
+
+    /**
+     * @description Controls access to a user's own profile document.
+     * @path /users/{userId}
+     * @allow (create): A new user with auth.uid='user123' can create their profile at /users/user123.
+     * @deny (list): No user, authenticated or not, can list all documents in the /users collection.
+     * @principle Restricts access to a user's own data tree and prevents user enumeration.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && isCreatingOwnUserDoc(userId);
+      allow update: if isExistingOwner(userId) && isNotChangingId();
+      allow delete: if isExistingOwner(userId);
+
+      /**
+       * @description Controls access to a user's project documents.
+       * @path /users/{userId}/projects/{projectId}
+       * @allow (create): User 'user123' can create a new project at /users/user123/projects/projABC.
+       * @deny (get): User 'user456' cannot read a project at /users/user123/projects/projABC.
+       * @principle Enforces document ownership for all operations within a user's private subcollection.
+       */
+      match /projects/{projectId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isCreatingValidProject(userId, projectId);
+        allow update: if isExistingOwner(userId) && isNotChangingProjectRelations();
+        allow delete: if isExistingOwner(userId);
+
+        /**
+         * @description Controls access to daily updates within a specific project.
+         * @path /users/{userId}/projects/{projectId}/dailyUpdates/{dailyUpdateId}
+         * @allow (list): User 'user123' can list all updates for their project at /users/user123/projects/projABC/dailyUpdates.
+         * @deny (delete): User 'user456' cannot delete an update at /users/user123/projects/projABC/dailyUpdates/updateXYZ.
+         * @principle Inherits ownership from the top-level user path, securing nested data.
+         */
+        match /dailyUpdates/{dailyUpdateId} {
+          allow get: if isOwner(userId);
+          allow list: if isOwner(userId);
+          allow create: if isOwner(userId) && isCreatingValidDailyUpdate(projectId, dailyUpdateId);
+          allow update: if isExistingOwner(userId) && isNotChangingDailyUpdateRelations();
+          allow delete: if isExistingOwner(userId);
+        }
+      }
+    }
+  }
+}
