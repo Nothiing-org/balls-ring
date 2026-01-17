@@ -27,16 +27,6 @@ const projectSchema = z.object({
 
 type ProjectFormData = z.infer<typeof projectSchema>;
 
-// Mulberry32 pseudo-random number generator
-function mulberry32(a: number) {
-  return function() {
-    let t = a += 0x6D2B79F5;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  }
-}
-
 export default function NewProjectForm() {
   const router = useRouter();
   const { addProject } = useProjects();
@@ -106,21 +96,12 @@ export default function NewProjectForm() {
     
             const croppedImage = canvas.toDataURL('image/png');
             
-            // Precompute shuffled pixel indices
             const maxPixelsCap = size * size;
-            const indices = Array.from({ length: maxPixelsCap }, (_, i) => i);
-            const seededRandom = mulberry32(data.randomSeed);
-            for (let i = indices.length - 1; i > 0; i--) {
-                const j = Math.floor(seededRandom() * (i + 1));
-                [indices[i], indices[j]] = [indices[j], indices[i]];
-            }
 
             const newProject: Project = {
               id: crypto.randomUUID(),
               name: data.name,
-              baseImage: originalImage,
               croppedImage: croppedImage,
-              shuffledPixelIndices: indices,
               revealMode: data.revealMode as RevealMode,
               pixelsPerFollower: data.pixelsPerFollower,
               maxPixelsCap: maxPixelsCap,

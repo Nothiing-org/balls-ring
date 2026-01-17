@@ -11,9 +11,7 @@ export interface Day {
 export interface Project {
   id: string;
   name: string;
-  baseImage: string; // The original uploaded image data URI
   croppedImage: string; // The 1000x1000 cropped image data URI for processing
-  shuffledPixelIndices: number[];
   revealMode: RevealMode;
   pixelsPerFollower: number;
   maxPixelsCap: number;
