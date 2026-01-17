@@ -10,8 +10,9 @@ export interface Day {
 
 export interface Project {
   id: string;
+  userId: string;
   name: string;
-  croppedImage: string; // The 1000x1000 cropped image data URI for processing
+  croppedImageUri: string; // The 1000x1000 cropped image data URI for processing
   revealMode: RevealMode;
   pixelsPerFollower: number;
   maxPixelsCap: number;

@@ -2,7 +2,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { Project } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Calendar, Users, Square } from 'lucide-react';
 
 type ProjectCardProps = {
@@ -11,8 +10,7 @@ type ProjectCardProps = {
 
 export default function ProjectCard({ project }: ProjectCardProps) {
   const lastDay = project.days.length > 0 ? project.days[project.days.length - 1] : null;
-  const placeholderImage = PlaceHolderImages.find(img => img.id === 'project-thumbnail-1');
-  const projectImage = project.days.length > 0 && lastDay?.frameDataUri ? lastDay.frameDataUri : project.croppedImage || placeholderImage?.imageUrl || '';
+  const projectImage = lastDay?.frameDataUri || project.croppedImageUri;
 
   return (
     <div className="premium-card h-full flex flex-col">

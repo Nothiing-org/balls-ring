@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useProjects } from '@/hooks/use-projects';
 import type { Project, RevealMode } from '@/lib/types';
+import { useUser } from '@/firebase';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +31,7 @@ type ProjectFormData = z.infer<typeof projectSchema>;
 export default function NewProjectForm() {
   const router = useRouter();
   const { addProject } = useProjects();
+  const { user } = useUser();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -65,8 +67,18 @@ export default function NewProjectForm() {
     }
   };
   
-  const processAndSaveProject = async (data: ProjectFormData): Promise<string> => {
-    return new Promise((resolve, reject) => {
+  const onSubmit = async (data: ProjectFormData) => {
+    if (!user) {
+      toast({
+        title: 'Error',
+        description: 'You must be logged in to create a project.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsLoading(true);
+
+    try {
         const reader = new FileReader();
         reader.readAsDataURL(data.baseImage);
         reader.onload = (e) => {
@@ -77,13 +89,16 @@ export default function NewProjectForm() {
           img.onload = () => {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            if (!ctx) return reject(new Error('Canvas context not available'));
+            if (!ctx) {
+                toast({ title: 'Error', description: 'Could not process image.', variant: 'destructive' });
+                setIsLoading(false);
+                return;
+            };
     
             const size = 1000; // Internal canvas size
             canvas.width = size;
             canvas.height = size;
     
-            // Simple crop/fit logic: center crop
             const hRatio = canvas.width / img.width;
             const vRatio = canvas.height / img.height;
             const ratio = Math.max(hRatio, vRatio);
@@ -94,14 +109,15 @@ export default function NewProjectForm() {
             ctx.drawImage(img, 0, 0, img.width, img.height,
               centerShift_x, centerShift_y, img.width * ratio, img.height * ratio);
     
-            const croppedImage = canvas.toDataURL('image/png');
+            const croppedImageUri = canvas.toDataURL('image/png');
             
             const maxPixelsCap = size * size;
+            const newProjectId = crypto.randomUUID();
 
-            const newProject: Project = {
-              id: crypto.randomUUID(),
+            const newProject: Omit<Project, 'userId'> = {
+              id: newProjectId,
               name: data.name,
-              croppedImage: croppedImage,
+              croppedImageUri: croppedImageUri,
               revealMode: data.revealMode as RevealMode,
               pixelsPerFollower: data.pixelsPerFollower,
               maxPixelsCap: maxPixelsCap,
@@ -111,24 +127,22 @@ export default function NewProjectForm() {
             };
     
             addProject(newProject);
-            resolve(newProject.id);
+            
+            toast({
+                title: 'Project Created',
+                description: `Your new project "${data.name}" is ready.`,
+            });
+            router.push(`/projects/${newProjectId}`);
           };
-          img.onerror = () => reject(new Error('Failed to load image'));
+          img.onerror = () => {
+            toast({ title: 'Error', description: 'Failed to load image.', variant: 'destructive' });
+            setIsLoading(false);
+          }
         };
-        reader.onerror = () => reject(new Error('Failed to read file'));
-    });
-  }
-
-
-  const onSubmit = async (data: ProjectFormData) => {
-    setIsLoading(true);
-    try {
-      const newProjectId = await processAndSaveProject(data);
-      toast({
-        title: 'Project Created',
-        description: `Your new project "${data.name}" is ready.`,
-      });
-      router.push(`/projects/${newProjectId}`);
+        reader.onerror = () => {
+            toast({ title: 'Error', description: 'Failed to read file.', variant: 'destructive' });
+            setIsLoading(false);
+        }
     } catch (error) {
       console.error(error);
       toast({
@@ -265,7 +279,7 @@ export default function NewProjectForm() {
       </div>
 
       <div className="pt-8 border-t">
-        <Button type="submit" className="btn-primary w-full" disabled={isLoading}>
+        <Button type="submit" className="btn-primary w-full" disabled={isLoading || !user}>
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

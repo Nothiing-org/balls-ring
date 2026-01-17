@@ -28,10 +28,8 @@ type ProjectDashboardProps = {
   project: Project;
 };
 
-export default function ProjectDashboard({ project: initialProject }: ProjectDashboardProps) {
-  const { getProject, addDayToProject } = useProjects();
-  const project = getProject(initialProject.id) || initialProject; // Get latest from hook
-  
+export default function ProjectDashboard({ project }: ProjectDashboardProps) {
+  const { addDayToProject } = useProjects();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -61,7 +59,7 @@ export default function ProjectDashboard({ project: initialProject }: ProjectDas
         }
 
         const input = {
-            baseImageUri: project.croppedImage,
+            baseImageUri: project.croppedImageUri,
             followerCount: followerCountForCalc,
             pixelsPerFollower: project.pixelsPerFollower,
             maxPixelsCap: project.maxPixelsCap,
@@ -98,7 +96,7 @@ export default function ProjectDashboard({ project: initialProject }: ProjectDas
     }
   };
 
-  const currentFrame = lastDay?.frameDataUri || project.croppedImage;
+  const currentFrame = lastDay?.frameDataUri || project.croppedImageUri;
 
   const handleExportPNG = () => {
     if (!currentFrame) return;
