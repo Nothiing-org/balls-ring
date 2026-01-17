@@ -38,7 +38,7 @@ class Orb {
         this.id = Math.random();
     }
 
-    update(dt: number, frozenOrbs: Orb[]) {
+    update(dt: number) {
         this.pos = this.pos.add(this.vel.multiply(dt));
         this.lifeClock -= dt;
     }
@@ -88,6 +88,13 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         }
         particlesRef.current.push(...newParticles);
     }, []);
+    
+    const purgeAndBurst = useCallback((escapePos: Vector, frozenOrbs: Orb[]) => {
+        createBurst(escapePos, 150); // More particles for the winner
+        for (const orb of frozenOrbs) {
+            createBurst(orb.pos, 50); // Burst for each frozen orb
+        }
+    }, [createBurst]);
 
     // Effect to spawn new orbs when project.days changes
     useEffect(() => {
@@ -136,63 +143,91 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
 
         // Update active orbs
         const stillActiveOrbs: Orb[] = [];
+        const newlyFrozenOrbs: Orb[] = [];
+        
         for (const orb of orbsRef.current) {
-            orb.update(dt, frozenOrbsRef.current);
+            orb.update(dt);
 
             if (orb.lifeClock <= 0) {
-                frozenOrbsRef.current.push(orb);
-                continue; // Orb is now frozen
+                newlyFrozenOrbs.push(orb);
+                continue;
             }
             
             // Wall collision
-            const distFromCenter = orb.pos.subtract(center).magnitude();
+            const toOrb = orb.pos.subtract(center);
+            const distFromCenter = toOrb.magnitude();
+
             if (distFromCenter > containerRadius - orb.radius) {
-                const normal = center.subtract(orb.pos).normalize();
+                const normal = toOrb.normalize().multiply(-1); // Inward normal
                 const reflectVel = orb.vel.subtract(normal.multiply(2 * orb.vel.dot(normal)));
                 orb.vel = reflectVel;
-                orb.pos = center.subtract(normal.multiply(containerRadius - orb.radius));
+                orb.pos = center.add(toOrb.normalize().multiply(containerRadius - orb.radius));
 
                 // Check for escape
                 const orbAngle = Math.atan2(orb.pos.y - center.y, orb.pos.x - center.x);
-                let apertureStart = apertureAngleRef.current;
                 const apertureSize = Math.PI / 8;
-                let angleDiff = Math.abs(orbAngle - apertureStart);
+                let angleDiff = Math.abs(orbAngle - apertureAngleRef.current);
                 angleDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
                 
-                if (angleDiff > apertureSize / 2) {
-                     stillActiveOrbs.push(orb);
-                } else {
-                    // WIN!
-                    createBurst(orb.pos, 100);
+                if (angleDiff <= apertureSize / 2) {
+                     // WIN!
+                    purgeAndBurst(orb.pos, frozenOrbsRef.current);
                     frozenOrbsRef.current = []; // Purge
+                } else {
+                     stillActiveOrbs.push(orb);
                 }
             } else {
                  stillActiveOrbs.push(orb);
             }
         }
         orbsRef.current = stillActiveOrbs;
+        frozenOrbsRef.current.push(...newlyFrozenOrbs);
         
-        // Orb-orb collision (simple)
+        // Orb-orb collision
         const allOrbs = [...orbsRef.current, ...frozenOrbsRef.current];
         for(let i = 0; i < allOrbs.length; i++) {
             for(let j = i + 1; j < allOrbs.length; j++) {
                 const orb1 = allOrbs[i];
                 const orb2 = allOrbs[j];
-                const dist = orb1.pos.subtract(orb2.pos);
-                if (dist.magnitude() < orb1.radius + orb2.radius) {
-                    const normal = dist.normalize();
-                    const tangent = new Vector(-normal.y, normal.x);
+                const distVec = orb1.pos.subtract(orb2.pos);
+                const distMag = distVec.magnitude();
+                const min_dist = orb1.radius + orb2.radius;
 
+                if (distMag < min_dist && distMag > 0) {
+                    const normal = distVec.normalize();
+                    const tangent = new Vector(-normal.y, normal.x);
+                    const isOrb1Frozen = frozenOrbsRef.current.some(o => o.id === orb1.id);
+                    const isOrb2Frozen = frozenOrbsRef.current.some(o => o.id === orb2.id);
+
+                    // Positional Correction
+                    const overlap = min_dist - distMag;
+                    if (!isOrb1Frozen && !isOrb2Frozen) {
+                        orb1.pos = orb1.pos.add(normal.multiply(overlap / 2));
+                        orb2.pos = orb2.pos.subtract(normal.multiply(overlap / 2));
+                    } else if (!isOrb1Frozen) {
+                        orb1.pos = orb1.pos.add(normal.multiply(overlap));
+                    } else if (!isOrb2Frozen) {
+                        orb2.pos = orb2.pos.subtract(normal.multiply(overlap));
+                    }
+
+                    // Velocity Update
                     const dpTan1 = orb1.vel.dot(tangent);
                     const dpTan2 = orb2.vel.dot(tangent);
-                    const dpNorm1 = orb1.vel.dot(normal);
-                    const dpNorm2 = orb2.vel.dot(normal);
-                    
-                    const m1 = (2 * dpNorm2) / 2;
-                    const m2 = (2 * dpNorm1) / 2;
 
-                    if (!frozenOrbsRef.current.includes(orb1)) orb1.vel = tangent.multiply(dpTan1).add(normal.multiply(m1));
-                    if (!frozenOrbsRef.current.includes(orb2)) orb2.vel = tangent.multiply(dpTan2).add(normal.multiply(m2));
+                    if (isOrb1Frozen && isOrb2Frozen) continue;
+
+                    if (!isOrb1Frozen && isOrb2Frozen) { // Orb1 hits frozen Orb2
+                        const dpNorm1 = orb1.vel.dot(normal);
+                        orb1.vel = tangent.multiply(dpTan1).add(normal.multiply(-dpNorm1));
+                    } else if (isOrb1Frozen && !isOrb2Frozen) { // Orb2 hits frozen Orb1
+                        const dpNorm2 = orb2.vel.dot(normal);
+                        orb2.vel = tangent.multiply(dpTan2).add(normal.multiply(-dpNorm2));
+                    } else { // Two active orbs collide
+                        const dpNorm1 = orb1.vel.dot(normal);
+                        const dpNorm2 = orb2.vel.dot(normal);
+                        orb1.vel = tangent.multiply(dpTan1).add(normal.multiply(dpNorm2));
+                        orb2.vel = tangent.multiply(dpTan2).add(normal.multiply(dpNorm1));
+                    }
                 }
             }
         }
@@ -219,8 +254,8 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         for (const orb of frozenOrbsRef.current) {
             ctx.beginPath();
             ctx.arc(orb.pos.x, orb.pos.y, orb.radius, 0, Math.PI * 2);
-            ctx.fillStyle = `hsl(var(--muted-foreground))`;
-            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = `hsl(var(--accent))`;
+            ctx.globalAlpha = 0.75;
             ctx.fill();
             ctx.globalAlpha = 1;
         }
@@ -256,7 +291,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         }
 
         animationFrameId.current = requestAnimationFrame(animate);
-    }, [createBurst]);
+    }, [createBurst, purgeAndBurst]);
 
     useEffect(() => {
         animationFrameId.current = requestAnimationFrame(animate);
