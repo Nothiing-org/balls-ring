@@ -208,7 +208,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         ringAngleRef.current += isPurgingRef.current ? 0.2 : config.ringSpeed;
 
         // Auto spawn if no active balls
-        if (ballsRef.current.length === 0 && !isPurgingRef.current) {
+        if (ballsRef.current.length === 0 && frozenBallsRef.current.length === 0 && !isPurgingRef.current) {
             ballsRef.current.push(new Ball(centerX, centerY - 100));
         }
 
