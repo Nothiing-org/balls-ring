@@ -148,7 +148,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         ringAngleRef.current += isPurgingRef.current ? 0.2 : config.ringSpeed;
 
         // Auto spawn if no active balls
-        if (ballsRef.current.length === 0 && !isPurgingRef.current) {
+        if (ballsRef.current.length === 0 && frozenBallsRef.current.length === 0 && !isPurgingRef.current) {
             ballsRef.current.push(new Ball(centerX, centerY - 100));
         }
 
@@ -180,41 +180,47 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                 const dist = Math.sqrt(dx*dx + dy*dy);
                 const minDist = b1.radius + b2.radius;
 
-                if (dist < minDist) {
-                    const angle = Math.atan2(dy, dx);
-                    const overlap = (minDist - dist) * 0.5;
+                if (dist < minDist && dist > 0) {
+                    const overlap = minDist - dist;
                     const nx = dx / dist;
                     const ny = dy / dist;
 
-                    if (!b1.isFrozen && !b2.isFrozen) {
-                        b1.x -= nx * overlap; b1.y -= ny * overlap;
-                        b2.x += nx * overlap; b2.y += ny * overlap;
+                    if (!b1.isFrozen && !b2.isFrozen) { // Both balls are active
+                        const overlapHalf = overlap * 0.5;
+                        b1.x -= nx * overlapHalf; b1.y -= ny * overlapHalf;
+                        b2.x += nx * overlapHalf; b2.y += ny * overlapHalf;
+
                         const relVx = b1.vx - b2.vx;
                         const relVy = b1.vy - b2.vy;
                         const dot = relVx * nx + relVy * ny;
+                        
                         if (dot <= 0) {
                            const restitution = 0.8;
-                           b1.vx -= (1 + restitution) * 0.5 * dot * nx;
-                           b1.vy -= (1 + restitution) * 0.5 * dot * ny;
-                           b2.vx += (1 + restitution) * 0.5 * dot * nx;
-                           b2.vy += (1 + restitution) * 0.5 * dot * ny;
+                           const impulse = (1 + restitution) * 0.5 * dot;
+                           b1.vx -= impulse * nx;
+                           b1.vy -= impulse * ny;
+                           b2.vx += impulse * nx;
+                           b2.vy += impulse * ny;
                         }
-                    } else if (!b1.isFrozen && b2.isFrozen) {
-                        b1.x -= nx * overlap * 2; b1.y -= ny * overlap * 2;
-                        const dot = b1.vx * nx + b1.vy * ny;
-                        if (dot < 0) {
-                            b1.vx -= 1.6 * dot * nx;
-                            b1.vy -= 1.6 * dot * ny;
-                            b1.isJumping = 8;
-                        }
-                    } else if (b1.isFrozen && !b2.isFrozen) {
-                        b2.x += nx * overlap * 2; b2.y += ny * overlap * 2;
-                        const dot = b2.vx * nx + b2.vy * ny;
-                         if (dot > 0) {
-                            b2.vx += 1.6 * -dot * nx;
-                            b2.vy += 1.6 * -dot * ny;
-                            b2.isJumping = 8;
-                        }
+                    } else if (!b1.isFrozen && b2.isFrozen) { // b1 active, b2 frozen
+                        b1.x -= nx * overlap;
+                        b1.y -= ny * overlap;
+                        
+                        const normalX = -nx;
+                        const normalY = -ny;
+                        b1.vx = normalX * WALL_JUMP_FORCE;
+                        b1.vy = normalY * WALL_JUMP_FORCE;
+                        b1.isJumping = 8;
+
+                    } else if (b1.isFrozen && !b2.isFrozen) { // b1 frozen, b2 active
+                        b2.x += nx * overlap;
+                        b2.y += ny * overlap;
+
+                        const normalX = nx;
+                        const normalY = ny;
+                        b2.vx = normalX * WALL_JUMP_FORCE;
+                        b2.vy = normalY * WALL_JUMP_FORCE;
+                        b2.isJumping = 8;
                     }
                 }
             }
@@ -270,6 +276,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                 b.color = '#ffffff';
                 frozenBallsRef.current.push(b);
                 createParticles(b.x, b.y, '#ffffff', 12);
+                ballsRef.current.push(new Ball(centerX, centerY - 100)); // Spawn new ball
             } else {
                 stillActiveBalls.push(b);
             }
@@ -295,7 +302,6 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
             ctx.save();
             ctx.globalAlpha = b.opacity;
             ctx.beginPath();
-            let drawRadius = b.radius;
             
             if (b.isJumping > 0) {
                 ctx.shadowBlur = 25; ctx.shadowColor = '#ffffff';
@@ -312,7 +318,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                 }
             }
 
-            ctx.arc(b.x, b.y, drawRadius, 0, Math.PI * 2);
+            ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
             ctx.fillStyle = b.isJumping > 0 ? '#ffffff' : b.color;
             ctx.fill();
             ctx.restore();
