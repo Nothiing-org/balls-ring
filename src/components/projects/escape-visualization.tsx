@@ -9,7 +9,7 @@ import { Plus, Minus } from 'lucide-react';
 const RING_RADIUS = 260;
 const BALL_RADIUS = 18;
 const GAP_SIZE = 0.65;
-const FROZEN_MAX_LIFE = 20000; // 20 seconds
+const FROZEN_MAX_LIFE = 10000; // 10 seconds
 const WALL_JUMP_FORCE = 15;
 
 const settings = {
@@ -71,7 +71,8 @@ class Particle {
 const EscapeVisualization = ({ project }: { project: Project }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animationFrameId = useRef<number>();
-    
+    const audioCtxRef = useRef<AudioContext | null>(null);
+
     const [difficulty, setDifficulty] = useState<Difficulty>('normal');
     const [isMinimized, setIsMinimized] = useState(false);
     const [frozenCount, setFrozenCount] = useState(0);
@@ -87,12 +88,71 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
     
     const dims = { width: 1000, height: 1000, centerX: 500, centerY: 500 };
 
+    // --- Sound Engine ---
+    const playSound = useCallback((type: 'bounce' | 'freeze' | 'purge' | 'vanish') => {
+        if (typeof window === 'undefined') return;
+
+        if (!audioCtxRef.current) {
+            try {
+                audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+            } catch (e) {
+                console.error("Web Audio API is not supported in this browser.");
+                return;
+            }
+        }
+        const audioCtx = audioCtxRef.current;
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+
+        switch (type) {
+            case 'bounce':
+                oscillator.type = 'triangle';
+                oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+                oscillator.start(audioCtx.currentTime);
+                oscillator.stop(audioCtx.currentTime + 0.2);
+                break;
+            case 'freeze':
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(220, audioCtx.currentTime + 0.3);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+                oscillator.start(audioCtx.currentTime);
+                oscillator.stop(audioCtx.currentTime + 0.3);
+                break;
+            case 'purge':
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(200, audioCtx.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.5);
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+                oscillator.start(audioCtx.currentTime);
+                oscillator.stop(audioCtx.currentTime + 0.5);
+                break;
+            case 'vanish':
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(220, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+                oscillator.start(audioCtx.currentTime);
+                oscillator.stop(audioCtx.currentTime + 0.5);
+                break;
+        }
+    }, []);
+
     const createParticles = useCallback((x: number, y: number, color: string, count = 10) => {
         for (let i = 0; i < count; i++) particlesRef.current.push(new Particle(x, y, color));
     }, []);
 
     const triggerPurge = useCallback(() => {
         if (isPurgingRef.current) return;
+        playSound('purge');
         isPurgingRef.current = true;
         setShowPurge(true);
 
@@ -105,7 +165,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
             isPurgingRef.current = false;
             setShowPurge(false);
         }, 1500);
-    }, [createParticles]);
+    }, [createParticles, playSound]);
 
     useEffect(() => {
         const currentLastDay = project.days.length > 0 ? project.days[project.days.length - 1] : null;
@@ -211,7 +271,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                         b1.vx = normalX * WALL_JUMP_FORCE;
                         b1.vy = normalY * WALL_JUMP_FORCE;
                         b1.isJumping = 8;
-
+                        playSound('bounce');
                     } else if (b1.isFrozen && !b2.isFrozen) { // b1 frozen, b2 active
                         b2.x += nx * overlap;
                         b2.y += ny * overlap;
@@ -221,6 +281,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                         b2.vx = normalX * WALL_JUMP_FORCE;
                         b2.vy = normalY * WALL_JUMP_FORCE;
                         b2.isJumping = 8;
+                        playSound('bounce');
                     }
                 }
             }
@@ -264,6 +325,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                     b.vx = -nx * WALL_JUMP_FORCE; b.vy = -ny * WALL_JUMP_FORCE;
                     b.isJumping = 12;
                     createParticles(b.x, b.y, '#ffffff', 3);
+                    playSound('bounce');
                     b.x = centerX + nx * (RING_RADIUS - b.radius - 2);
                     b.y = centerY + ny * (RING_RADIUS - b.radius - 2);
                 }
@@ -276,6 +338,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                 b.color = '#ffffff';
                 frozenBallsRef.current.push(b);
                 createParticles(b.x, b.y, '#ffffff', 12);
+                playSound('freeze');
                 stillActiveBalls.push(new Ball(centerX, centerY - 100));
             } else {
                  if (!b.escaped) {
@@ -291,8 +354,12 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
              const timeAsFrozen = Date.now() - b.frozenAt;
              if (timeAsFrozen > FROZEN_MAX_LIFE) {
                 b.opacity -= 0.05;
-                if (b.opacity > 0) stillFrozenBalls.push(b);
-                else createParticles(b.x, b.y, '#ffffff', 8);
+                if (b.opacity > 0) {
+                    stillFrozenBalls.push(b);
+                } else {
+                    createParticles(b.x, b.y, '#ffffff', 8);
+                    playSound('vanish');
+                }
              } else {
                 stillFrozenBalls.push(b);
              }
@@ -360,7 +427,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         }
 
         animationFrameId.current = requestAnimationFrame(animate);
-    }, [difficulty, createParticles, triggerPurge]);
+    }, [difficulty, createParticles, triggerPurge, playSound]);
 
     useEffect(() => {
         animationFrameId.current = requestAnimationFrame(animate);
