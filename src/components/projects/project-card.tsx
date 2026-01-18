@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import type { Project } from '@/lib/types';
-import { Button } from '@/components/ui/button';
-import { Calendar, Users, Square } from 'lucide-react';
+import { Calendar, Users, Square, Puzzle } from 'lucide-react';
+import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 type ProjectCardProps = {
   project: Project;
@@ -10,7 +10,11 @@ type ProjectCardProps = {
 
 export default function ProjectCard({ project }: ProjectCardProps) {
   const lastDay = project.days.length > 0 ? project.days[project.days.length - 1] : null;
-  const projectImage = lastDay?.frameDataUri || project.croppedImageUri;
+  const isEscapeMode = project.revealMode === 'escape';
+  
+  const projectImage = isEscapeMode && !lastDay?.frameDataUri
+    ? PlaceHolderImages[0].imageUrl
+    : (lastDay?.frameDataUri || project.croppedImageUri);
 
   return (
     <div className="premium-card h-full flex flex-col">
@@ -40,16 +44,25 @@ export default function ProjectCard({ project }: ProjectCardProps) {
             {lastDay ? `${lastDay.followerCount.toLocaleString()} followers` : '0 followers'}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <Square size={16} />
-          <span>
-            {lastDay ? `${Math.round((lastDay.pixelsRevealed / project.maxPixelsCap) * 100)}% revealed` : '0% revealed'}
-          </span>
-        </div>
+        {isEscapeMode ? (
+          <div className="flex items-center gap-2">
+            <Puzzle size={16} />
+            <span>Escape Room</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Square size={16} />
+            <span>
+              {lastDay && typeof lastDay.pixelsRevealed === 'number' && project.maxPixelsCap > 0
+                ? `${Math.round((lastDay.pixelsRevealed / project.maxPixelsCap) * 100)}% revealed`
+                : '0% revealed'}
+            </span>
+          </div>
+        )}
       </div>
       <div className="mt-6 pt-6 border-t">
         <Link href={`/projects/${project.id}`} className="btn-primary w-full">
-          Generate Today
+          {isEscapeMode ? 'View Dashboard' : 'Generate Today'}
         </Link>
       </div>
     </div>
