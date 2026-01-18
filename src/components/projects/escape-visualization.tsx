@@ -10,7 +10,7 @@ const RING_RADIUS = 260;
 const BALL_RADIUS = 18;
 const GAP_SIZE = 0.65;
 const FROZEN_MAX_LIFE = 20000; // 20 seconds
-const WALL_JUMP_FORCE = 12;
+const WALL_JUMP_FORCE = 15;
 
 const settings = {
     easy: { gravity: 0.1, ringSpeed: 0.015, friction: 0.995 },
