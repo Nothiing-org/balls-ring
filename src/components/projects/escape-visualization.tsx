@@ -199,7 +199,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         // Background
         ctx.fillStyle = '#050505';
         ctx.fillRect(0, 0, width, height);
-        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
         ctx.lineWidth = 1;
         for(let i=0; i<width; i+=100) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,height); ctx.stroke(); }
         for(let i=0; i<height; i+=100) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(width,i); ctx.stroke(); }
