@@ -52,17 +52,22 @@ class Particle {
     
     constructor(x: number, y: number, color: string) {
         this.x = x; this.y = y;
-        this.vx = (Math.random() - 0.5) * 8;
-        this.vy = (Math.random() - 0.5) * 8;
+        this.vx = (Math.random() - 0.5) * 12;
+        this.vy = (Math.random() - 0.5) * 12;
         this.life = 1.0;
-        this.decay = Math.random() * 0.04 + 0.02;
+        this.decay = Math.random() * 0.03 + 0.015;
         this.color = color;
     }
-    update() { this.x += this.vx; this.y += this.vy; this.life -= this.decay; }
+    update() { 
+        this.x += this.vx; 
+        this.y += this.vy; 
+        this.vy += 0.15; // Gravity
+        this.life -= this.decay; 
+    }
     draw(ctx: CanvasRenderingContext2D) {
         ctx.globalAlpha = Math.max(0, this.life);
         ctx.fillStyle = this.color;
-        ctx.beginPath(); ctx.arc(this.x, this.y, 2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(this.x, this.y, 2.5, 0, Math.PI * 2); ctx.fill();
         ctx.globalAlpha = 1;
     }
 }
@@ -158,15 +163,19 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         isPurgingRef.current = true;
         setShowPurge(true);
 
-        frozenBallsRef.current.forEach(b => createParticles(b.x, b.y, '#ffffff', 15));
-        ballsRef.current.forEach(b => createParticles(b.x, b.y, b.color, 20));
+        // Create dust from all current balls
+        frozenBallsRef.current.forEach(b => createParticles(b.x, b.y, '#ffffff', 70));
+        ballsRef.current.forEach(b => createParticles(b.x, b.y, b.color, 100));
+
+        // Instantly remove balls from the simulation
+        ballsRef.current = [];
+        frozenBallsRef.current = [];
 
         setTimeout(() => {
-            ballsRef.current = [];
-            frozenBallsRef.current = [];
+            // Reset the purge state text/effects after the particles have faded
             isPurgingRef.current = false;
             setShowPurge(false);
-        }, 1500);
+        }, 2000);
     }, [createParticles, playSound]);
 
     useEffect(() => {
