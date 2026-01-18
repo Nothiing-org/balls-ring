@@ -8,6 +8,7 @@ import { z } from 'zod';
 import Image from 'next/image';
 
 import { generateDailyFrame } from '@/ai/flows/generate-daily-frame';
+import { generateProjectVideo } from '@/ai/flows/generate-video';
 import { useProjects } from '@/hooks/use-projects';
 import { useToast } from '@/hooks/use-toast';
 
@@ -33,6 +34,7 @@ export default function ProjectDashboard({ project }: ProjectDashboardProps) {
   const { addDayToProject } = useProjects();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
 
   const lastDay = project.days.length > 0 ? project.days[project.days.length - 1] : null;
   const currentDayIndex = lastDay ? lastDay.dayIndex + 1 : 1;
@@ -129,12 +131,64 @@ export default function ProjectDashboard({ project }: ProjectDashboardProps) {
     document.body.removeChild(link);
   };
   
-  const handleExportMP4 = () => {
+  const handleExportMP4 = async () => {
+    if (project.revealMode === 'escape') {
+      toast({
+        title: "Not Yet Supported",
+        description: "Video export for 'Escape Room' mode is coming soon!",
+      });
+      return;
+    }
+
+    if (!project.croppedImageUri) {
+        toast({
+            title: "Image not found",
+            description: "Cannot generate video without a base image.",
+            variant: "destructive",
+        });
+        return;
+    }
+
+    setIsGeneratingVideo(true);
     toast({
-      title: "Video Export (Coming Soon)",
-      description: "Full video export is a planned feature. Stay tuned!",
+      title: "🎬 Video Generation Started",
+      description: "Your video is being created. This may take a few minutes. We'll let you know when it's ready for download.",
     });
+
+    try {
+      const result = await generateProjectVideo({
+        croppedImageUri: project.croppedImageUri,
+        projectName: project.name,
+        revealMode: project.revealMode,
+      });
+
+      if (result && result.videoDataUri) {
+        const link = document.createElement('a');
+        link.href = result.videoDataUri;
+        link.download = `${project.name.replace(/\s+/g, '_')}_reveal.mp4`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast({
+          title: "✅ Video Ready!",
+          description: "Your video has been downloaded.",
+        });
+      } else {
+        throw new Error('Video generation returned no data.');
+      }
+    } catch (error) {
+      console.error(error);
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      toast({
+        title: '🎥 Video Generation Failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingVideo(false);
+    }
   };
+
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-12">
@@ -202,8 +256,13 @@ export default function ProjectDashboard({ project }: ProjectDashboardProps) {
                         <Button onClick={handleExportPNG} variant="outline" className="w-full" disabled={!lastDay || project.revealMode === 'escape'}>
                             <Download className="mr-2 h-4 w-4" /> Export as PNG
                         </Button>
-                        <Button onClick={handleExportMP4} variant="outline" className="w-full" disabled={!lastDay}>
-                            <Download className="mr-2 h-4 w-4" /> Export as MP4
+                        <Button onClick={handleExportMP4} variant="outline" className="w-full" disabled={!lastDay || isGeneratingVideo}>
+                           {isGeneratingVideo ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <Download className="mr-2 h-4 w-4" />
+                            )}
+                            {isGeneratingVideo ? 'Generating Video...' : 'Export as MP4'}
                         </Button>
                     </CardContent>
                 </Card>
