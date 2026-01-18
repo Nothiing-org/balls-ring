@@ -148,7 +148,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         ringAngleRef.current += isPurgingRef.current ? 0.2 : config.ringSpeed;
 
         // Auto spawn if no active balls
-        if (ballsRef.current.length === 0 && frozenBallsRef.current.length === 0 && !isPurgingRef.current) {
+        if (ballsRef.current.length === 0 && !isPurgingRef.current) {
             ballsRef.current.push(new Ball(centerX, centerY - 100));
         }
 
@@ -276,9 +276,11 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                 b.color = '#ffffff';
                 frozenBallsRef.current.push(b);
                 createParticles(b.x, b.y, '#ffffff', 12);
-                ballsRef.current.push(new Ball(centerX, centerY - 100)); // Spawn new ball
+                stillActiveBalls.push(new Ball(centerX, centerY - 100));
             } else {
-                stillActiveBalls.push(b);
+                 if (!b.escaped) {
+                    stillActiveBalls.push(b);
+                }
             }
         });
         ballsRef.current = stillActiveBalls;
