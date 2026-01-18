@@ -139,7 +139,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         // Background
         ctx.fillStyle = '#050505';
         ctx.fillRect(0, 0, width, height);
-        ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
         ctx.lineWidth = 1;
         for(let i=0; i<width; i+=100) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,height); ctx.stroke(); }
         for(let i=0; i<height; i+=100) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(width,i); ctx.stroke(); }
@@ -147,8 +147,8 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         const config = settings[difficulty];
         ringAngleRef.current += isPurgingRef.current ? 0.2 : config.ringSpeed;
 
-        // Auto spawn if empty
-        if (ballsRef.current.length === 0 && frozenBallsRef.current.length === 0 && !isPurgingRef.current) {
+        // Auto spawn if no active balls
+        if (ballsRef.current.length === 0 && !isPurgingRef.current) {
             ballsRef.current.push(new Ball(centerX, centerY - 100));
         }
 
@@ -266,9 +266,10 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
             if (Date.now() - b.spawnTime > b.lifeSpan && !b.escaped) {
                 b.isFrozen = true;
                 b.frozenAt = Date.now();
-                b.vx = 0; b.vy = 0; b.color = '#ff3b3b';
+                b.vx = 0; b.vy = 0;
+                b.color = '#ffffff';
                 frozenBallsRef.current.push(b);
-                createParticles(b.x, b.y, '#ff3b3b', 12);
+                createParticles(b.x, b.y, '#ffffff', 12);
             } else {
                 stillActiveBalls.push(b);
             }
@@ -282,7 +283,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
              if (timeAsFrozen > FROZEN_MAX_LIFE) {
                 b.opacity -= 0.05;
                 if (b.opacity > 0) stillFrozenBalls.push(b);
-                else createParticles(b.x, b.y, '#ff3b3b', 8);
+                else createParticles(b.x, b.y, '#ffffff', 8);
              } else {
                 stillFrozenBalls.push(b);
              }
@@ -297,7 +298,6 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
             let drawRadius = b.radius;
             
             if (b.isJumping > 0) {
-                drawRadius = Math.max(1, drawRadius + Math.sin(b.isJumping * 0.8) * 5);
                 ctx.shadowBlur = 25; ctx.shadowColor = '#ffffff';
             } else {
                 ctx.shadowBlur = b.isFrozen ? 0 : 25; ctx.shadowColor = b.color;
@@ -307,7 +307,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                 const timeAsFrozen = Date.now() - b.frozenAt;
                 if (timeAsFrozen > FROZEN_MAX_LIFE * 0.75) {
                     if (Math.floor(Date.now() / 100) % 2 === 0) {
-                        ctx.shadowBlur = 15; ctx.shadowColor = '#ff3b3b';
+                        ctx.shadowBlur = 15; ctx.shadowColor = '#ffffff';
                     }
                 }
             }
@@ -317,8 +317,23 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
             ctx.fill();
             ctx.restore();
 
+            // Countdown timer text
             if (!b.isFrozen && !b.escaped) {
                 const elapsed = Date.now() - b.spawnTime;
+                const remainingLifetime = b.lifeSpan - elapsed;
+
+                if (remainingLifetime <= 3100 && remainingLifetime > 0) {
+                    const remainingSeconds = Math.ceil(remainingLifetime / 1000);
+                    ctx.save();
+                    ctx.font = 'bold 20px sans-serif';
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(remainingSeconds.toString(), b.x, b.y);
+                    ctx.restore();
+                }
+                
+                // Timer Ring
                 const remaining = Math.max(0, 1 - (elapsed / b.lifeSpan));
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, b.radius + 8, -Math.PI/2, (-Math.PI/2) + (Math.PI * 2 * remaining));
