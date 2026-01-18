@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { Project, Day } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { Plus, Minus } from 'lucide-react';
+import { Plus, Minus, Play, Pause, Volume2, VolumeX } from 'lucide-react';
 
 // --- Simulation Constants ---
 const RING_RADIUS = 260;
@@ -75,6 +75,8 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
 
     const [difficulty, setDifficulty] = useState<Difficulty>('normal');
     const [isMinimized, setIsMinimized] = useState(false);
+    const [isPaused, setIsPaused] = useState(false);
+    const [isMuted, setIsMuted] = useState(false);
     const [frozenCount, setFrozenCount] = useState(0);
     const [statusText, setStatusText] = useState('NORMAL');
     const [showPurge, setShowPurge] = useState(false);
@@ -90,7 +92,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
 
     // --- Sound Engine ---
     const playSound = useCallback((type: 'bounce' | 'freeze' | 'purge' | 'vanish') => {
-        if (typeof window === 'undefined') return;
+        if (isMuted || typeof window === 'undefined') return;
 
         if (!audioCtxRef.current) {
             try {
@@ -144,7 +146,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                 oscillator.stop(audioCtx.currentTime + 0.5);
                 break;
         }
-    }, []);
+    }, [isMuted]);
 
     const createParticles = useCallback((x: number, y: number, color: string, count = 10) => {
         for (let i = 0; i < count; i++) particlesRef.current.push(new Particle(x, y, color));
@@ -189,6 +191,11 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
 
 
     const animate = useCallback(() => {
+        if (isPaused) {
+            animationFrameId.current = requestAnimationFrame(animate);
+            return;
+        }
+
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
@@ -427,7 +434,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         }
 
         animationFrameId.current = requestAnimationFrame(animate);
-    }, [difficulty, createParticles, triggerPurge, playSound]);
+    }, [difficulty, createParticles, triggerPurge, playSound, isPaused]);
 
     useEffect(() => {
         animationFrameId.current = requestAnimationFrame(animate);
@@ -483,6 +490,27 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                         <span className="text-[10px] uppercase font-bold text-white/50">Frozen Nodes</span>
                         <span className="text-xs font-black text-red-500">{frozenCount}</span>
                     </div>
+                </div>
+            </div>
+
+            <div className="absolute bottom-6 left-6 pointer-events-auto z-10">
+                <div className="mod-panel flex gap-2 !p-2">
+                    <button
+                        type="button"
+                        onClick={() => setIsPaused(!isPaused)}
+                        className="h-12 w-12 flex items-center justify-center bg-white/5 border border-white/10 text-white/60 rounded-lg transition-all hover:bg-white/10 hover:text-white"
+                        aria-label={isPaused ? 'Play' : 'Pause'}
+                    >
+                        {isPaused ? <Play size={20} /> : <Pause size={20} />}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setIsMuted(!isMuted)}
+                        className="h-12 w-12 flex items-center justify-center bg-white/5 border border-white/10 text-white/60 rounded-lg transition-all hover:bg-white/10 hover:text-white"
+                        aria-label={isMuted ? 'Unmute' : 'Mute'}
+                    >
+                        {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                    </button>
                 </div>
             </div>
 
