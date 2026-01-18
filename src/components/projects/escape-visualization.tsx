@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { Project, Day } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { Plus, Minus } from 'lucide-react';
 
 // --- Simulation Constants ---
 const RING_RADIUS = 260;
@@ -72,6 +73,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
     const animationFrameId = useRef<number>();
     
     const [difficulty, setDifficulty] = useState<Difficulty>('normal');
+    const [isMinimized, setIsMinimized] = useState(false);
     const [frozenCount, setFrozenCount] = useState(0);
     const [statusText, setStatusText] = useState('NORMAL');
     const [showPurge, setShowPurge] = useState(false);
@@ -146,7 +148,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         ringAngleRef.current += isPurgingRef.current ? 0.2 : config.ringSpeed;
 
         // Auto spawn if empty
-        if (ballsRef.current.length === 0 && !isPurgingRef.current && project.days.length === 0) {
+        if (ballsRef.current.length === 0 && frozenBallsRef.current.length === 0 && !isPurgingRef.current) {
             ballsRef.current.push(new Ball(centerX, centerY - 100));
         }
 
@@ -335,7 +337,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         }
 
         animationFrameId.current = requestAnimationFrame(animate);
-    }, [difficulty, createParticles, triggerPurge, project.days.length]);
+    }, [difficulty, createParticles, triggerPurge]);
 
     useEffect(() => {
         animationFrameId.current = requestAnimationFrame(animate);
@@ -346,6 +348,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
 
     const DiffButton = ({ level, children }: { level: Difficulty, children: React.ReactNode }) => (
       <button
+        type="button"
         className={cn(
           "diff-btn bg-white/5 border border-white/10 text-white/60 px-3.5 py-2 rounded-lg text-[10px] font-extrabold uppercase tracking-wider transition-all hover:bg-white/10 hover:text-white",
           { "active bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.3)]": difficulty === level }
@@ -360,13 +363,24 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         <div className="relative w-full aspect-square bg-[#050505] rounded-lg border border-border">
             <div className="absolute top-6 left-6 pointer-events-none flex flex-col gap-5 z-10">
                 <div className="mod-panel bg-black/70 backdrop-blur-md p-4 rounded-2xl border border-white/10 shadow-2xl pointer-events-auto">
-                    <div className="text-[10px] uppercase tracking-widest text-white/40 font-black mb-3">Simulation Mods</div>
-                    <div className="flex gap-1.5">
-                        <DiffButton level="easy">Easy</DiffButton>
-                        <DiffButton level="normal">Normal</DiffButton>
-                        <DiffButton level="hard">Hard</DiffButton>
-                        <DiffButton level="impossible">H-Impossible</DiffButton>
+                    <div className="flex justify-between items-center mb-3">
+                        <div className="text-[10px] uppercase tracking-widest text-white/40 font-black">Simulation Mods</div>
+                        <button 
+                            type="button" 
+                            onClick={() => setIsMinimized(!isMinimized)} 
+                            className="text-white/50 hover:text-white transition-opacity pointer-events-auto"
+                        >
+                            {isMinimized ? <Plus size={16} /> : <Minus size={16} />}
+                        </button>
                     </div>
+                    {!isMinimized && (
+                        <div className="flex gap-1.5">
+                            <DiffButton level="easy">Easy</DiffButton>
+                            <DiffButton level="normal">Normal</DiffButton>
+                            <DiffButton level="hard">Hard</DiffButton>
+                            <DiffButton level="impossible">H-Impossible</DiffButton>
+                        </div>
+                    )}
                 </div>
                  <div className="mod-panel bg-black/70 backdrop-blur-md p-4 rounded-2xl border border-white/10 shadow-2xl pointer-events-auto flex flex-col gap-2">
                     <div className="flex justify-between items-center min-w-[180px] bg-white/5 px-4 py-2.5 rounded-xl">
