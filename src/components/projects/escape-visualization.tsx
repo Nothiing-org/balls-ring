@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { Project, Day } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { Plus, Minus, Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { Plus, Minus, Play, Pause, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
 
 // --- Simulation Constants ---
 const RING_RADIUS = 260;
@@ -11,6 +11,7 @@ const BALL_RADIUS = 18;
 const GAP_SIZE = 0.65;
 const FROZEN_MAX_LIFE = 10000; // 10 seconds
 const WALL_JUMP_FORCE = 15;
+const MAX_ACTIVE_BALLS = 50; // Performance cap
 
 const settings = {
     easy: { gravity: 0.1, ringSpeed: 0.015, friction: 0.995 },
@@ -75,6 +76,7 @@ class Particle {
 
 const EscapeVisualization = ({ project }: { project: Project }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
     const animationFrameId = useRef<number>();
     const audioCtxRef = useRef<AudioContext | null>(null);
 
@@ -82,13 +84,16 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
     const [isMinimized, setIsMinimized] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
     const [frozenCount, setFrozenCount] = useState(0);
+    const [pendingOrbCount, setPendingOrbCount] = useState(0);
     const [statusText, setStatusText] = useState('NORMAL');
     const [showPurge, setShowPurge] = useState(false);
 
     const ballsRef = useRef<Ball[]>([]);
     const frozenBallsRef = useRef<Ball[]>([]);
     const particlesRef = useRef<Particle[]>([]);
+    const pendingOrbsRef = useRef<number>(0);
     const ringAngleRef = useRef(0);
     const isPurgingRef = useRef(false);
     const lastDayRef = useRef<Day | null>(project.days.length > 0 ? project.days[project.days.length - 1] : null);
@@ -188,15 +193,11 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
             const orbsToSpawn = newFollowers > 0 ? newFollowers * project.pixelsPerFollower : 0;
 
             if (orbsToSpawn > 0) {
-                const newOrbs: Ball[] = [];
-                for (let i = 0; i < orbsToSpawn; i++) {
-                    newOrbs.push(new Ball(dims.centerX, dims.centerY - 100));
-                }
-                ballsRef.current.push(...newOrbs);
+                 pendingOrbsRef.current += orbsToSpawn;
             }
         }
         lastDayRef.current = currentLastDay;
-    }, [project.days, project.pixelsPerFollower, dims.centerX, dims.centerY]);
+    }, [project.days, project.pixelsPerFollower]);
 
 
     const animate = useCallback(() => {
@@ -212,6 +213,19 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         
         const { width, height, centerX, centerY } = dims;
 
+        // --- Spawning Logic ---
+        const canSpawn = ballsRef.current.length < MAX_ACTIVE_BALLS;
+        if (canSpawn && pendingOrbsRef.current > 0) {
+            const orbsToSpawnNow = Math.min(pendingOrbsRef.current, MAX_ACTIVE_BALLS - ballsRef.current.length);
+            for(let i=0; i<orbsToSpawnNow; i++) {
+                ballsRef.current.push(new Ball(dims.centerX, dims.centerY - 100));
+            }
+            pendingOrbsRef.current -= orbsToSpawnNow;
+        } else if (ballsRef.current.length === 0 && frozenBallsRef.current.length === 0 && pendingOrbsRef.current === 0 && !isPurgingRef.current) {
+             // Fallback to ensure simulation doesn't die
+            ballsRef.current.push(new Ball(centerX, centerY - 100));
+        }
+
         // Background
         ctx.fillStyle = '#050505';
         ctx.fillRect(0, 0, width, height);
@@ -223,10 +237,6 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         const config = settings[difficulty];
         ringAngleRef.current += isPurgingRef.current ? 0.2 : config.ringSpeed;
 
-        // Auto spawn if no active balls
-        if (ballsRef.current.length === 0 && frozenBallsRef.current.length === 0 && !isPurgingRef.current) {
-            ballsRef.current.push(new Ball(centerX, centerY - 100));
-        }
 
         // Draw Ring
         ctx.save();
@@ -355,7 +365,6 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                 frozenBallsRef.current.push(b);
                 createParticles(b.x, b.y, '#ffffff', 12);
                 playSound('freeze');
-                stillActiveBalls.push(new Ball(centerX, centerY - 100));
             } else {
                  if (!b.escaped) {
                     stillActiveBalls.push(b);
@@ -436,6 +445,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
 
         // Update UI Text
         setFrozenCount(frozenBallsRef.current.length);
+        setPendingOrbCount(pendingOrbsRef.current);
         if (isPurgingRef.current) {
             setStatusText("PURGING");
         } else {
@@ -443,7 +453,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
         }
 
         animationFrameId.current = requestAnimationFrame(animate);
-    }, [difficulty, createParticles, triggerPurge, playSound, isPaused]);
+    }, [difficulty, createParticles, triggerPurge, playSound, isPaused, dims.centerX, dims.centerY]);
 
     useEffect(() => {
         animationFrameId.current = requestAnimationFrame(animate);
@@ -451,6 +461,24 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
             if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
         };
     }, [animate]);
+
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
+    const toggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            containerRef.current?.requestFullscreen().catch(err => {
+                alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    };
 
     const DiffButton = ({ level, children }: { level: Difficulty, children: React.ReactNode }) => (
       <button
@@ -466,7 +494,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
     );
 
     return (
-        <div className="relative w-full aspect-square bg-[#050505] rounded-lg border border-border">
+        <div ref={containerRef} className="relative w-full aspect-square bg-[#050505] rounded-lg border border-border data-[fullscreen=true]:!rounded-none data-[fullscreen=true]:!border-none" data-fullscreen={isFullscreen}>
             <div className="absolute top-6 left-6 pointer-events-none flex flex-col gap-5 z-10">
                 <div className="mod-panel bg-black/70 backdrop-blur-md p-4 rounded-2xl border border-white/10 shadow-2xl pointer-events-auto">
                     <div className="flex justify-between items-center mb-3">
@@ -499,6 +527,10 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                         <span className="text-[10px] uppercase font-bold text-white/50">Frozen Nodes</span>
                         <span className="text-xs font-black text-red-500">{frozenCount}</span>
                     </div>
+                     <div className="flex justify-between items-center min-w-[180px] bg-white/5 px-4 py-2.5 rounded-xl">
+                        <span className="text-[10px] uppercase font-bold text-white/50">Pending Orbs</span>
+                        <span className="text-xs font-black text-yellow-400">{pendingOrbCount}</span>
+                    </div>
                 </div>
             </div>
 
@@ -519,6 +551,14 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                         aria-label={isMuted ? 'Unmute' : 'Mute'}
                     >
                         {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                    </button>
+                     <button
+                        type="button"
+                        onClick={toggleFullscreen}
+                        className="h-12 w-12 flex items-center justify-center bg-white/5 border border-white/10 text-white/60 rounded-lg transition-all hover:bg-white/10 hover:text-white"
+                        aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                    >
+                        {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
                     </button>
                 </div>
             </div>
