@@ -487,7 +487,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
       <button
         type="button"
         className={cn(
-          "diff-btn bg-white/5 border border-white/10 text-white/60 px-3.5 py-2 rounded-lg text-[10px] font-extrabold uppercase tracking-wider transition-all hover:bg-white/10 hover:text-white",
+          "diff-btn bg-white/5 border border-white/10 text-white/60 px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-md sm:rounded-lg text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider transition-all hover:bg-white/10 hover:text-white",
           { "active bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.3)]": difficulty === level }
         )}
         onClick={() => setDifficulty(level)}
@@ -498,10 +498,10 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
 
     return (
         <div ref={containerRef} className="relative w-full aspect-square bg-[#050505] rounded-lg border border-border data-[fullscreen=true]:!rounded-none data-[fullscreen=true]:!border-none" data-fullscreen={isFullscreen}>
-            <div className="absolute top-6 left-6 pointer-events-none flex flex-col gap-5 z-10">
-                <div className="mod-panel bg-black/70 backdrop-blur-md p-4 rounded-2xl border border-white/10 shadow-2xl pointer-events-auto">
-                    <div className="flex justify-between items-center mb-3">
-                        <div className="text-[10px] uppercase tracking-widest text-white/40 font-black">Simulation Mods</div>
+            <div className="absolute top-3 left-3 sm:top-6 sm:left-6 pointer-events-none flex flex-col gap-3 sm:gap-5 z-10">
+                <div className="mod-panel bg-black/70 backdrop-blur-md p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-white/10 shadow-2xl pointer-events-auto">
+                    <div className="flex justify-between items-center mb-2 sm:mb-3">
+                        <div className="text-[9px] sm:text-[10px] uppercase tracking-widest text-white/40 font-black">Simulation Mods</div>
                         <button 
                             type="button" 
                             onClick={() => setIsMinimized(!isMinimized)} 
@@ -511,7 +511,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                         </button>
                     </div>
                     {!isMinimized && (
-                        <div className="flex gap-1.5">
+                        <div className="flex flex-wrap gap-1 sm:gap-1.5">
                             <DiffButton level="easy">Easy</DiffButton>
                             <DiffButton level="normal">Normal</DiffButton>
                             <DiffButton level="hard">Hard</DiffButton>
@@ -519,30 +519,30 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                         </div>
                     )}
                 </div>
-                 <div className="mod-panel bg-black/70 backdrop-blur-md p-4 rounded-2xl border border-white/10 shadow-2xl pointer-events-auto flex flex-col gap-2">
-                    <div className="flex justify-between items-center min-w-[180px] bg-white/5 px-4 py-2.5 rounded-xl">
-                        <span className="text-[10px] uppercase font-bold text-white/50">Core Engine</span>
+                 <div className="mod-panel bg-black/70 backdrop-blur-md p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-white/10 shadow-2xl pointer-events-auto flex flex-col gap-2">
+                    <div className="flex justify-between items-center min-w-[150px] sm:min-w-[180px] bg-white/5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl">
+                        <span className="text-[9px] sm:text-[10px] uppercase font-bold text-white/50">Core Engine</span>
                         <span className={cn("text-xs font-black", statusText === 'PURGING' ? 'text-green-400 animate-pulse' : 'text-blue-400')}>
                             {statusText}
                         </span>
                     </div>
-                    <div className="flex justify-between items-center min-w-[180px] bg-white/5 px-4 py-2.5 rounded-xl">
-                        <span className="text-[10px] uppercase font-bold text-white/50">Frozen Nodes</span>
+                    <div className="flex justify-between items-center min-w-[150px] sm:min-w-[180px] bg-white/5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl">
+                        <span className="text-[9px] sm:text-[10px] uppercase font-bold text-white/50">Frozen Nodes</span>
                         <span className="text-xs font-black text-red-500">{frozenCount}</span>
                     </div>
-                     <div className="flex justify-between items-center min-w-[180px] bg-white/5 px-4 py-2.5 rounded-xl">
-                        <span className="text-[10px] uppercase font-bold text-white/50">Pending Orbs</span>
+                     <div className="flex justify-between items-center min-w-[150px] sm:min-w-[180px] bg-white/5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl">
+                        <span className="text-[9px] sm:text-[10px] uppercase font-bold text-white/50">Pending Orbs</span>
                         <span className="text-xs font-black text-yellow-400">{pendingOrbCount}</span>
                     </div>
                 </div>
             </div>
 
-            <div className="absolute bottom-6 left-6 pointer-events-auto z-10">
+            <div className="absolute bottom-3 left-3 sm:bottom-6 sm:left-6 pointer-events-auto z-10">
                 <div className="mod-panel flex gap-2 !p-2">
                     <button
                         type="button"
                         onClick={() => setIsPaused(!isPaused)}
-                        className="h-12 w-12 flex items-center justify-center bg-white/5 border border-white/10 text-white/60 rounded-lg transition-all hover:bg-white/10 hover:text-white"
+                        className="h-10 w-10 sm:h-12 sm:w-12 flex items-center justify-center bg-white/5 border border-white/10 text-white/60 rounded-lg transition-all hover:bg-white/10 hover:text-white"
                         aria-label={isPaused ? 'Play' : 'Pause'}
                     >
                         {isPaused ? <Play size={20} /> : <Pause size={20} />}
@@ -550,7 +550,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                     <button
                         type="button"
                         onClick={() => setIsMuted(!isMuted)}
-                        className="h-12 w-12 flex items-center justify-center bg-white/5 border border-white/10 text-white/60 rounded-lg transition-all hover:bg-white/10 hover:text-white"
+                        className="h-10 w-10 sm:h-12 sm:w-12 flex items-center justify-center bg-white/5 border border-white/10 text-white/60 rounded-lg transition-all hover:bg-white/10 hover:text-white"
                         aria-label={isMuted ? 'Unmute' : 'Mute'}
                     >
                         {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
@@ -558,7 +558,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                      <button
                         type="button"
                         onClick={toggleFullscreen}
-                        className="h-12 w-12 flex items-center justify-center bg-white/5 border border-white/10 text-white/60 rounded-lg transition-all hover:bg-white/10 hover:text-white"
+                        className="h-10 w-10 sm:h-12 sm:w-12 flex items-center justify-center bg-white/5 border border-white/10 text-white/60 rounded-lg transition-all hover:bg-white/10 hover:text-white"
                         aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
                     >
                         {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
@@ -567,7 +567,7 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
             </div>
 
             <div className={cn(
-                "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[100px] font-black text-[#00ff88] transition-all duration-300 pointer-events-none [text-shadow:0_0_40px_rgba(0,255,136,0.6)] z-20 -tracking-wider",
+                "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-5xl sm:text-[100px] font-black text-[#00ff88] transition-all duration-300 pointer-events-none [text-shadow:0_0_40px_rgba(0,255,136,0.6)] z-20 -tracking-wider",
                 showPurge ? "opacity-100 scale-100" : "opacity-0 scale-50"
             )}>
                 PURGED
