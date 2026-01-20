@@ -365,6 +365,9 @@ const EscapeVisualization = ({ project }: { project: Project }) => {
                 frozenBallsRef.current.push(b);
                 createParticles(b.x, b.y, '#ffffff', 12);
                 playSound('freeze');
+
+                // Add a new ball to the list for the next frame to replace this one.
+                stillActiveBalls.push(new Ball(dims.centerX, dims.centerY - 100));
             } else {
                  if (!b.escaped) {
                     stillActiveBalls.push(b);
